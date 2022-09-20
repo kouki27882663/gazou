@@ -125,6 +125,7 @@ class _MyHomePageState extends State<MyHomePage> {
         )
     );
   }
+  //testbranch
    void _opneUrl() async {
     final url = Uri.parse('https://docs.google.com/forms/d/168uxibsGbr7ciBM2FsLRksgxEMEkJ_TzCcePeq9n82s/edit?usp=sharing'); //←ここに表示させたいURLを入力する
     if (await canLaunchUrl(url)) {
