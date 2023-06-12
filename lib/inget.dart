@@ -8,7 +8,7 @@ import 'package:quiver/async.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:gazou/pause.dart';
 
-//get0
+//inget
 /// 写真撮影画面
 class TakePictureScreen extends StatefulWidget {
   const TakePictureScreen({
@@ -32,6 +32,7 @@ class TakePictureScreenState extends State<TakePictureScreen> {
   int tmp = 0;
   int count = 0;
   final _audio = AudioCache();
+  String inout = "in";
 
   // ③ カウントダウン処理を行う関数を定義
   Future <void> startTimer() async{

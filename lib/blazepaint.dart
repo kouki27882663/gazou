@@ -64,8 +64,8 @@ class _SavePageInState extends State<SavePageIn> {
       ElevatedButton(
         onPressed: (){
           saveImage();
-          Navigator.push(context, 
-          MaterialPageRoute(builder: (context) => BlazeLandmarkPage1(path1: widget.path1,path2: widget.path2,path3:widget.path3),
+          Navigator.push(context,
+              MaterialPageRoute(builder: (context) => BlazeLandmarkPage1(path1: widget.path1,path2: widget.path2,path3:widget.path3),
           )
           );
           },
