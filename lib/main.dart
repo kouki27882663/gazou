@@ -83,19 +83,20 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar:  AppBar(centerTitle: true,title:  Text(widget.title,style:TextStyle(color: appbar_text_colors)),
-        backgroundColor: appbar_colors),
+        // appBar:  AppBar(centerTitle: true,title:  Text(widget.title,style:TextStyle(color: appbar_text_colors)),
+        // backgroundColor: appbar_colors),
         body:  Stack(
           children: <Widget>[
-            SizedBox(
+            Padding(padding: EdgeInsets.only(top: 35),
+              child: SizedBox(
               width: double.infinity,
-              child: Image.asset("assets/dakko3.jpg"),),
+              child: Image.asset("assets/title.png"),)
+            ),
+
+
             Column(
           children: <Widget>[
-            // Container(
-            //   padding: EdgeInsets.only(top: 32),
-            //   child: Text('選択してください',style: TextStyle(fontSize: 30),),
-            // ),
+
            
            SizedBox(height: 160,),
             Row(
