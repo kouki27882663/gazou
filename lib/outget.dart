@@ -7,6 +7,10 @@ import 'package:gazou/main.dart';
 import 'package:quiver/async.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:gazou/pause.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
 
 
 /// 写真撮影画面
@@ -103,7 +107,10 @@ class OutTakePicture1State extends State<OutTakePicture1> {
                   onPressed: () async {
                     // 写真を撮る
                     final image = await _controller.takePicture();
-
+                    
+                    //画像をローカルに保存
+                    String imagePath = image.path; // XFile からファイルのパスを取得
+                    await _saveImageToGallery(imagePath);
                   await Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => OutBlazePage1(imagePath:image.path,camera:widget.camera),
@@ -121,6 +128,18 @@ class OutTakePicture1State extends State<OutTakePicture1> {
       ),
     );
   }
+
+//画像をローカルに保存
+Future<void> _saveImageToGallery(String imagePath) async {
+  // 保存したい画像ファイルのパスを指定
+  final result = await ImageGallerySaver.saveFile(imagePath);
+
+  if (result != null) {
+    print('画像がギャラリーアルバムに保存されました: $result');
+  } else {
+    print('画像の保存に失敗しました');
+  }
+}
 }
 
 /// 写真撮影画面
@@ -208,7 +227,7 @@ class OutTakePicture2State extends State<OutTakePicture2> {
           ),
           Opacity(
             opacity: check ? opacity = 0.8 : opacity = 0.8,
-            child: Image.asset("assets/⇨.png"),
+            child: Image.asset("assets/right.png"),
           ),
           Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -220,6 +239,9 @@ class OutTakePicture2State extends State<OutTakePicture2> {
                   onPressed: () async {
                     // 写真を撮る
                     final image = await _controller.takePicture();
+                    //画像をローカルに保存
+                    String imagePath = image.path; // XFile からファイルのパスを取得
+                    await _saveImageToGallery(imagePath);
 
                   await Navigator.push(
                     context,
@@ -238,6 +260,17 @@ class OutTakePicture2State extends State<OutTakePicture2> {
       ),
     );
   }
+//画像をローカルに保存
+Future<void> _saveImageToGallery(String imagePath) async {
+  // 保存したい画像ファイルのパスを指定
+  final result = await ImageGallerySaver.saveFile(imagePath);
+
+  if (result != null) {
+    print('画像がギャラリーアルバムに保存されました: $result');
+  } else {
+    print('画像の保存に失敗しました');
+  }
+}
 }
 
 /// 写真撮影画面
@@ -328,7 +361,7 @@ class OutTakePicture3State extends State<OutTakePicture3> {
           ),
           Opacity(
             opacity: check ? opacity = 0.8 : opacity = 0.8,
-            child: Image.asset("assets/⇦.png"),
+            child: Image.asset("assets/left.png"),
           ),
           Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -340,7 +373,10 @@ class OutTakePicture3State extends State<OutTakePicture3> {
                   onPressed: () async {
                     // 写真を撮る
                     final image = await _controller.takePicture();
-
+                    //画像をローカルに保存
+                    String imagePath = image.path; // XFile からファイルのパスを取得
+                    await _saveImageToGallery(imagePath);
+                    
                   await Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => OutBlazePage3(imagePath:image.path,camera:widget.camera,path1:widget.path1,path2:widget.path2,offsets1: widget.offsets1, offsets2: widget.offsets2,),
@@ -358,4 +394,15 @@ class OutTakePicture3State extends State<OutTakePicture3> {
       ),
     );
   }
+//画像をローカルに保存
+Future<void> _saveImageToGallery(String imagePath) async {
+  // 保存したい画像ファイルのパスを指定
+  final result = await ImageGallerySaver.saveFile(imagePath);
+
+  if (result != null) {
+    print('画像がギャラリーアルバムに保存されました: $result');
+  } else {
+    print('画像の保存に失敗しました');
+  }
+}
 }

@@ -12,6 +12,15 @@ import 'package:gazou/test.dart';
 import 'package:gazou/hand20.dart';
 import 'package:gazou/developer.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';//日本語フォントに変更するため
+import 'package:http/http.dart' as http;
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:image/image.dart' as img;
+import 'dart:convert';
+
 //こんにちは
 Future<void> main() async {
   // main 関数内で非同期処理を呼び出すための設定
@@ -80,23 +89,28 @@ class _MyHomePageState extends State<MyHomePage> {
   var sub_text_colors = Colors.white;
   var icon_colors = Colors.black;
 
+  final TextEditingController idController = TextEditingController();
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar:  AppBar(centerTitle: true,title:  Text(widget.title,style:TextStyle(color: appbar_text_colors)),
-        backgroundColor: appbar_colors),
+        // appBar:  AppBar(centerTitle: true,title:  Text(widget.title,style:TextStyle(color: appbar_text_colors)),
+        // backgroundColor: appbar_colors),
         body:  Stack(
           children: <Widget>[
-            SizedBox(
+            Padding(padding: EdgeInsets.only(top: 50),
+            child: SizedBox(
               width: double.infinity,
-              child: Image.asset("assets/dakko3.jpg"),),
+              child: Image.asset("assets/title.png"),),
+            ),
             Column(
           children: <Widget>[
             // Container(
             //   padding: EdgeInsets.only(top: 32),
             //   child: Text('選択してください',style: TextStyle(fontSize: 30),),
             // ),
-           
+
            SizedBox(height: 160,),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -138,13 +152,42 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 ),
               ]
+              ),              
+              Form(
+                key: formKey,
+                child: Padding(
+                  padding: EdgeInsets.only(top:280,left: 20),
+                  child: TextFormField(
+                    controller: idController,
+                    decoration: InputDecoration(labelText: 'IDを入れるとID画像が生成されます'),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'IDは任意です';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
               ),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                Padding(padding: EdgeInsets.only(top: 210,right: 10),
+                Padding(padding: EdgeInsets.only(top: 10,right: 10),
               child: ElevatedButton(
                   onPressed: (){
+                    if (formKey.currentState!.validate()) {
+                    // 1. IDを受け取る
+                    String id = idController.text;
+
+                    // 2. IDを画像化
+                    Uint8List? imageBytes = textToImage(id);
+
+                    if (imageBytes != null) {
+                      // 3. 画像を保存
+                      saveImage(imageBytes);
+                    }
+                  }
+
                     Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => ManualPage(title:widget.title,camera:widget.camera),
@@ -174,7 +217,7 @@ class _MyHomePageState extends State<MyHomePage> {
               //     ),
               //     child: Text('修正を行う',style: TextStyle(fontSize: 40,color: Colors.black)),
               //   ), 
-              Padding(padding: EdgeInsets.only(top: 210,left: 10),
+              Padding(padding: EdgeInsets.only(top: 10,left: 10),
                child: ElevatedButton(
                   onPressed: (){
                     Navigator.push(
@@ -182,6 +225,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     MaterialPageRoute(builder: (context) => HandexpPage()
               )
                     );
+              // _saveImageToGallery();
                   },
                   style: ElevatedButton.styleFrom(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
@@ -211,6 +255,70 @@ class _MyHomePageState extends State<MyHomePage> {
             //       child: Text('開発者',style: TextStyle(fontSize: 20,color: main_text_colors)),
             //     ),
             // )
+    // SizedBox(
+    //   width: 100, // 幅を調整
+    //   height: 100, // 高さを調整
+    //   child: RadarChart(
+    //     RadarChartData(
+    //       getTitle: ((index,angle) {
+    //         if (index == 0){
+    //           return RadarChartTitle(
+    //                     text: '抱っこの高さ',
+    //                     angle: 0
+    //           );
+    //         }
+    //         if (index == 1){
+    //           return RadarChartTitle(
+    //                     text: '背筋',
+    //                     angle: 0
+    //           );
+    //         }
+    //         if (index == 2){
+    //           return RadarChartTitle(
+    //                     text: '手首の位置',
+    //                     angle: 0
+    //           );
+    //         }
+    //         if (index == 3){
+    //           return RadarChartTitle(
+    //                     text: 'Desktop',
+    //                     angle: 0
+    //           );
+    //         }
+    //         if (index == 4){
+    //           return RadarChartTitle(
+    //                     text: 'Desktop',
+    //                     angle: 0
+    //           );
+    //         }
+    //         else{
+    //           return RadarChartTitle(
+    //                     text: 'Desktop',
+    //                     angle: 0
+    //           );
+    //         }
+    //       }),
+    //       dataSets: [
+    //         RadarDataSet(
+              
+    //           fillColor: Colors.red.withOpacity(0.4),
+    //           dataEntries: [
+    //             //同じ数値に全部したら何故か(メモリ不足?)クラッシュする
+    //             RadarEntry(value: 10),
+    //             RadarEntry(value: 10),
+    //             RadarEntry(value: 10),
+    //             RadarEntry(value: 10),
+    //             RadarEntry(value: 10-0.01),
+    //           ],
+              
+    //         ),
+    //       ],
+          
+    //       // 他のチャートプロパティを設定
+          
+    //     ),
+    //   ),
+    // ),
               ],
             ),
           ],
@@ -227,4 +335,65 @@ class _MyHomePageState extends State<MyHomePage> {
       throw 'このURLにはアクセスできません';
     }
   }
+
+//   Future<void> _Imagesave() async {
+//   // 1. アプリ内の画像ファイルをアセットからコピーして保存
+//   final appDocDir = await getApplicationDocumentsDirectory();
+//   final imageFile = File('${appDocDir.path}/white.png');
+  
+//   // 2. アセットから画像ファイルをコピー
+//   final ByteData data = await rootBundle.load('assets/white.png');
+//   final List<int> bytes = data.buffer.asUint8List();
+//   await imageFile.writeAsBytes(bytes);
+
+//   // 3. 保存したファイルをギャラリーアルバムに保存
+//   final result = await ImageGallerySaver.saveFile(imageFile.path);
+  
+//     if (result != null) {
+//       print('画像がギャラリーアルバムに保存されました: $result');
+//     } else {
+//       print('画像の保存に失敗しました');
+//     }
+//   }
+  Uint8List? textToImage(String text) {
+    final img.Image image = img.Image(200, 200); // 画像サイズを設定
+
+    // 画像にテキストを描画
+    img.fill(image, img.getColor(255, 255, 255)); // 背景を白に設定
+    img.drawString(image, img.arial_24, 10, 80, text, color: img.getColor(0, 0, 0));
+
+    return Uint8List.fromList(img.encodePng(image));
+  }
+
+void saveImage(Uint8List imageBytes) async {
+  final result = await ImageGallerySaver.saveImage(imageBytes);
+  if (result != null) {
+    print('画像がギャラリーアルバムに保存されました: $result');
+  } else {
+    print('画像の保存に失敗しました');
+  }
 }
+}
+
+    // SizedBox(
+    //   width: 100, // 幅を調整
+    //   height: 100, // 高さを調整
+    //   child: RadarChart(
+    //     RadarChartData(
+    //       dataSets: [
+    //         RadarDataSet(
+    //           fillColor: Colors.amber,
+    //           dataEntries: [
+    //             RadarEntry(value: 5),
+    //             RadarEntry(value: 5),
+    //             RadarEntry(value: 5),
+    //             RadarEntry(value: 5),
+    //             RadarEntry(value: 5),
+    //           ],
+    //         ),
+    //       ],
+    //       // 他のチャートプロパティを設定
+    //     ),
+    //   ),
+    // ),
+    

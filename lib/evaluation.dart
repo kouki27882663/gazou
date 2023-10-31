@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:gazou/hand20.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 //評価結果を返す
 class Evaluation extends StatefulWidget {
@@ -22,6 +23,8 @@ class Evaluation extends StatefulWidget {
 class _EvaluationState extends State<Evaluation> {
   String kendall = "評価結果を出す";
   String score = "姿勢スコア：計算中";
+  String imagefront = "";
+  String imageside = "";
   String advice = "";
   String badpoint = "";
   String text = "";
@@ -37,7 +40,7 @@ class _EvaluationState extends State<Evaluation> {
   bool tf = true;
   bool badtf = false;
   bool texttf = true;
-  bool advicetf = true;
+  bool advicetf = false;
 
   List<String> badtxt= [];
   List<String> advicetxt= [];
@@ -61,6 +64,8 @@ class _EvaluationState extends State<Evaluation> {
   List<Offset> _adjust_front(List<Offset> landmarkfront){
   List<Offset> landmarkfront = widget.offsets1;
   List<Offset> landmarks = [];
+  print("こんにち");
+  print(landmarkfront);
   //正面調整
   if(landmarkfront.length!=9){
     landmarks.add(landmarkfront[0]);
@@ -320,20 +325,23 @@ class _EvaluationState extends State<Evaluation> {
     int hip_hand = 0;
     double back_hand_rate = 0;
     double hip_hand_rate = 0;
-    String ishiphand = "";
+    String isdir_hiphand = "";
+    String isdir_backhand = "";
     if(landmarkfront[5].dy > landmarkfront[6].dy){
       print(landmarkfront[5]);
       print(landmarkfront[6]);
       print("背中を支えている手首はLeft_wristです");
       back_hand = 6;
       hip_hand = 5;
-      ishiphand = "Left_wrist";
+      isdir_hiphand = "Left";
+      isdir_backhand = "Right";
     }
     else{
       print("背中を支えている手首はRight_wristです");
       back_hand = 5;
       hip_hand = 6;
-      ishiphand = "Right_wrist";
+      isdir_hiphand = "Right";
+      isdir_backhand = "Left";
     }
     var hip_midpoint = (landmarkfront[7] + landmarkfront[8])/2;
     var sholder_midpoint = (landmarkfront[1] + landmarkfront[2])/2;
@@ -342,9 +350,76 @@ class _EvaluationState extends State<Evaluation> {
     //return hip_hand_rate.toString();
     hugheight.add(hip_hand_rate.toString());
     hugheight.add(back_hand_rate.toString());
-    hugheight.add(ishiphand);
+    hugheight.add(isdir_hiphand);
+    hugheight.add(isdir_backhand);
 
     return hugheight;
+  }
+  //脇の閉まり具合について
+  double _ArmpitFit_calculation(){
+    List<Offset>landmarkfront = [];
+    //調整済み座標持ってきてる
+    landmarkfront = _adjust_front(landmarkfront);
+
+    //座標番号を入れる，初期値は0とする
+    int hip_hand_shoulder = 0;
+    int hip_hand_elbow = 0;
+    //脇の閉まり具合に関する評価スコアをArmpitFitとする
+    double ArmpitFit = 0;
+
+    if(landmarkfront[5].dy > landmarkfront[6].dy){
+      print("背中を支えている手首はLeft_wristです");
+      hip_hand_shoulder = 1;
+      hip_hand_elbow = 3;
+    }
+    else{
+      print("背中を支えている手首はRight_wristです");
+      hip_hand_shoulder = 2;
+      hip_hand_elbow = 4;
+    }
+    ArmpitFit = (landmarkfront[hip_hand_shoulder].dy - landmarkfront[hip_hand_elbow].dy) / (landmarkfront[hip_hand_shoulder].dx - landmarkfront[hip_hand_elbow].dx);
+    print("脇の閉まり具合:"+ArmpitFit.toString());
+    return ArmpitFit.abs();
+  }
+  //乳児の密着具合について
+  double _Closeness_calculation(){
+    List<Offset>landmarkfront = [];
+    List<Offset>landmarkleft = [];
+    List<Offset>landmarkright = [];
+    //3方向の調整済み座標を呼び出す
+    landmarkfront = _adjust_front(landmarkfront);
+    landmarkleft = _adjust_left(landmarkleft);
+    landmarkright = _adjust_right(landmarkright);
+    //脇の閉まり具合に関する評価スコアをArmpitFitとする
+    double Closeness = 0;
+    var isdir_backhand = _Hugheight_calculation()[2];//Hugheightの2番目ががishiphand
+    var point1;
+    var point2;
+    var point3;
+    if(isdir_backhand=="Left"){//もし右側の特徴点座標を使うなら2を原点として，1と3がなす角度
+      point1 = landmarkright[1];
+      point2 = landmarkright[2];
+      point3 = landmarkright[3];
+    }
+    else{//お尻を支える腕が右の時，右側の特徴点座標を参照
+      point1 = landmarkleft[1];
+      point2 = landmarkleft[2];
+      point3 = landmarkleft[3];
+      print("a");
+    }
+    //2つのベクトルのなす角度を計算
+    double abX = point2.dx - point1.dx;
+    double abY = point2.dy - point1.dy;
+    double bcX = point3.dx - point2.dx;
+    double bcY = point3.dy - point2.dy;
+    double dotProduct = abX * bcX + abY * bcY;
+    double magnitudeAB = sqrt(abX * abX + abY * abY);
+    double magnitudeBC = sqrt(bcX * bcX + bcY * bcY);
+    double cosTheta = dotProduct / (magnitudeAB * magnitudeBC);
+    double angleInRadians = acos(cosTheta);
+    // ラジアンを度に変換
+    Closeness = angleInRadians * (180 / pi);
+    return Closeness.abs();//脇の閉まり具合に関する評価スコアを返す
   }
   //計算した値をリストでまとめて返す”さまらいず”
   //   [1.9385906915861866, 不明, 0.3848952710315345, 0.8713518732334877, Right_wrist,ankle_knee,ankle_hip,ankle_shoulder]
@@ -361,6 +436,10 @@ class _EvaluationState extends State<Evaluation> {
 
     var left_kendalllist = _leftpoint_classification();
 
+    var ArmpitFit = _ArmpitFit_calculation();
+
+    var Closeness = _Closeness_calculation();
+
     summraize.add(ShoulderScore.toString());//肩の平行具合
     summraize.add(right_kendalllist[0]);//ケンダル
     summraize.add(Hugheight[0].toString());//ヒップハンド
@@ -372,12 +451,16 @@ class _EvaluationState extends State<Evaluation> {
     summraize.add(left_kendalllist[1]);//膝までの角度(左)
     summraize.add(left_kendalllist[2]);//腰までの角度(左)
     summraize.add(left_kendalllist[3]);//肩までの角度(左)
+    summraize.add(ArmpitFit.toString());//脇の閉まり具合
+    summraize.add(Closeness.toString());//脇の閉まり具合
 
     print("B1:"+summraize[7]);
     print("B2:"+summraize[6]);
     print("B3:"+summraize[5]);
     print("A:"+summraize[0]);
     print("R:"+summraize[2]);
+    print("脇の閉まり具合:"+summraize[11]);
+    print("密着具合:"+summraize[12]);
     return summraize;
 
   }
@@ -431,7 +514,8 @@ class _EvaluationState extends State<Evaluation> {
     int tmp = sumscore.toInt();
     sumscore = tmp.toDouble();
 
-    score = "抱っこの点数:" + sumscore.ceil().toString() + "点";
+    // score = "抱っこの点数:" + sumscore.ceil().toString() + "点";
+    score = sumscore.ceil().toString();
     return score;
   }
 
@@ -704,24 +788,24 @@ class _EvaluationState extends State<Evaluation> {
           ),
           content: Column(mainAxisSize: MainAxisSize.min,
           children: [
-            Visibility(child: Text(text,style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: texttf,),
+            Visibility(child: Text(text,style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.orange)),visible: texttf,),
             Visibility(child: Text(kendall_text),visible: tf ),
 
             Column(crossAxisAlignment: CrossAxisAlignment.start, children:[
             //BadPont
             Visibility(child: Text("横から見た姿勢："),visible: badtf),
-            Visibility(child: Text(badtxt[0],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: badtf),
+            Visibility(child: Text(badtxt[0],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.orange)),visible: badtf),
             Visibility(child: Text("抱っこの位置："),visible: badtf),
-            Visibility(child: Text(badtxt[1],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: badtf),
+            Visibility(child: Text(badtxt[1],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.orange)),visible: badtf),
             Visibility(child: Text("左右の肩の高さ："),visible: badtf),
-            Visibility(child: Text(badtxt[2],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: badtf),
+            Visibility(child: Text(badtxt[2],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.orange)),visible: badtf),
             //アドバイス
             Visibility(child: Text("横から見た姿勢："),visible: advicetf),
-            Visibility(child: Text(advicetxt[0],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: advicetf),
+            Visibility(child: Text(advicetxt[0],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.orange)),visible: advicetf),
             Visibility(child: Text("抱っこの位置："),visible: advicetf),
-            Visibility(child: Text(advicetxt[1],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: advicetf),
+            Visibility(child: Text(advicetxt[1],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.orange)),visible: advicetf),
             Visibility(child: Text("左右の肩の高さ："),visible: advicetf),
-            Visibility(child: Text(advicetxt[2],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: advicetf)
+            Visibility(child: Text(advicetxt[2],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.orange)),visible: advicetf)
           ]
           )
             ],
@@ -744,11 +828,23 @@ class _EvaluationState extends State<Evaluation> {
     );
   }
 
+List<double> _devicesizeget(){
+    List<double> devicesize = [];
+      //デバイスのサイズ取得
+      final double deviceWidth = MediaQuery.of(context).size.width;
+      final double deviceHeight = MediaQuery.of(context).size.height;
+      devicesize.add(deviceWidth);
+      devicesize.add(deviceHeight);
+      return devicesize;
+  }
+
   @override
   Widget build(BuildContext context) {
     //初期状態
     if(count==0){
       image = widget.path1;
+      imagefront = widget.path1;
+      imageside = widget.path2;
       offset = widget.offsets1;
       dir = "front";
       button = "score";
@@ -772,83 +868,308 @@ class _EvaluationState extends State<Evaluation> {
           children: <Widget>[
             Column(
             //上のボタン
-          children:[ Row(mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Padding(padding: EdgeInsets.only(left: 5),
-                  child: ElevatedButton(
-                      onPressed: (){
-                        setState(() {
-                          image = widget.path1;
-                          offset = widget.offsets1;
-                          dir = "front";
-                          upcolor_1 = Colors.orange;
-                          upcolor_2 = Colors.grey;
-                          upcolor_3 = Colors.grey;
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        fixedSize:const Size(120,60),
-                        backgroundColor: upcolor_1,//ボタン背景色
-                        elevation: 16,
-                      ),
-                      child: Text("正面",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 28,color: main_text_colors)),
-                    ),
-                    ),
-                    Padding(padding: EdgeInsets.only(left: 5),
-                  child: ElevatedButton(
-                      onPressed: (){
-                        setState(() {
-                          image = widget.path2;
-                          offset = widget.offsets2;
-                          dir = "right";
-                          upcolor_1 = Colors.grey;
-                          upcolor_2 = Colors.orange;
-                          upcolor_3 = Colors.grey;
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        fixedSize:const Size(120,60),
-                        backgroundColor: upcolor_2,
-                        elevation: 16,
-                      ),
-                      child: Text("⇨側面",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 28,color: main_text_colors)),
-                    ),
-                    ),
-                    Padding(padding: EdgeInsets.only(left: 5),
-                  child: ElevatedButton(
-                      onPressed: (){
-                        setState(() {
-                          image = widget.path3;
-                          offset = widget.offsets3;
-                          dir = "left";
-                          upcolor_1 = Colors.grey;
-                          upcolor_2 = Colors.grey;
-                          upcolor_3 = Colors.orange;
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        fixedSize:const Size(120,60),
-                        backgroundColor: upcolor_3,
-                        elevation: 16,
-                      ),
-                      child: Text("⇦側面",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 28,color: main_text_colors)),
-                    ),
-                    ),
+          children:[ 
+            // Row(mainAxisAlignment: MainAxisAlignment.center,
+            //   children: [
+            //     Padding(padding: EdgeInsets.only(left: 5),
+            //       child: ElevatedButton(
+            //           onPressed: (){
+            //             setState(() {
+            //               image = widget.path1;
+            //               offset = widget.offsets1;
+            //               dir = "front";
+            //               upcolor_1 = Colors.orange;
+            //               upcolor_2 = Colors.grey;
+            //               upcolor_3 = Colors.grey;
+            //             });
+            //           },
+            //           style: ElevatedButton.styleFrom(
+            //             fixedSize:const Size(120,60),
+            //             backgroundColor: upcolor_1,//ボタン背景色
+            //             elevation: 16,
+            //           ),
+            //           child: Text("正面",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 28,color: main_text_colors)),
+            //         ),
+            //         ),
+            //         Padding(padding: EdgeInsets.only(left: 5),
+            //       child: ElevatedButton(
+            //           onPressed: (){
+            //             setState(() {
+            //               image = widget.path2;
+            //               offset = widget.offsets2;
+            //               dir = "right";
+            //               upcolor_1 = Colors.grey;
+            //               upcolor_2 = Colors.orange;
+            //               upcolor_3 = Colors.grey;
+            //             });
+            //           },
+            //           style: ElevatedButton.styleFrom(
+            //             fixedSize:const Size(120,60),
+            //             backgroundColor: upcolor_2,
+            //             elevation: 16,
+            //           ),
+            //           child: Text("⇨側面",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 28,color: main_text_colors)),
+            //         ),
+            //         ),
+            //         Padding(padding: EdgeInsets.only(left: 5),
+            //       child: ElevatedButton(
+            //           onPressed: (){
+            //             setState(() {
+            //               image = widget.path3;
+            //               offset = widget.offsets3;
+            //               dir = "left";
+            //               upcolor_1 = Colors.grey;
+            //               upcolor_2 = Colors.grey;
+            //               upcolor_3 = Colors.orange;
+            //             });
+            //           },
+            //           style: ElevatedButton.styleFrom(
+            //             fixedSize:const Size(120,60),
+            //             backgroundColor: upcolor_3,
+            //             elevation: 16,
+            //           ),
+            //           child: Text("⇦側面",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 28,color: main_text_colors)),
+            //         ),
+            //         ),
+            //   ],
+              // ),
               ],
-              ),],),
-            Padding(padding: EdgeInsets.only(top:70),
-                child: Image.file(
-                  File(image)
-                ),
               ),
-            Padding(padding: EdgeInsets.only(top:70),
+            // Padding(padding: EdgeInsets.only(top:70),
+            //     child: Image.file(
+            //       File(image)
+            //     ),
+            //   ),
+            // Padding(padding: EdgeInsets.only(top:70),
+            //     child: CustomPaint(
+            //       //引数の渡す方
+            //       painter: MyPainter(offset,dir,button,summraize),
+            //       // タッチを有効にするため、childが必要
+            //       child: Center(),
+            //   ),
+            //   ),
+            //高菜
+            Column(children:[ 
+            Row(
+              children: <Widget>[
+                Container(
+                  width: _devicesizeget()[0]/2,
+                  height: _devicesizeget()[1]/2.6,
+                  // color: Colors.yellow,
+
+                  child:Stack(
+                    children: [
+                      // Positioned(left: 90,top: 90,child: 
+                      Transform.scale(
+                        scale: 1, // スケールファクター（2.0で2倍に拡大）
+                      // child: Align(
+                      //   alignment: Alignment.bottomLeft,
+                      // child:Positioned(
+                      //   left: 30, // 左からの位置
+                      //   top: 30,  // 上からの位置
+                      //   child:
+                      // ClipRect(
+                      //   clipper: MyClipper(offset=widget.offsets1),
+                          child: Image.file(
+                            File(imagefront),
+                          ),
+                    // ),
+                      ),
+                      // ),
+                  // ),
+                CustomPaint(
+                  //引数の渡す方
+                  painter: MyPainter(offset=widget.offsets1,dir="front",button,summraize),
+                  // タッチを有効にするため、childが必要
+                  child: Center(),
+              ),
+                CustomPaint(
+                  size: Size(_devicesizeget()[0]/2, _devicesizeget()[1]/2.6),  // 描画領域のサイズを設定
+                  painter: SquarePainter("front"),  // 描画ロジックを指定したカスタムペインター
+                )
+                    ],
+                  ), 
+                  
+                ),
+                
+                
+                Container(
+                  width: _devicesizeget()[0]/2,
+                  height: _devicesizeget()[1]/2.6,
+                  // color: Colors.red,
+                  child:Stack(
+                    children: [
+                      // ClipRect(
+                      //   clipper: MyClipper(offset=widget.offsets2),
+                      //   child: 
+                        Image.file(
+                            File(imageside),
+                            fit: BoxFit.fitWidth,
+                    ),
+              // ),
+              Padding(padding: EdgeInsets.only(top:0),
                 child: CustomPaint(
                   //引数の渡す方
-                  painter: MyPainter(offset,dir,button,summraize),
+                  painter: MyPainter(offset=widget.offsets2,dir="right",button,summraize),
                   // タッチを有効にするため、childが必要
                   child: Center(),
               ),
               ),
+              CustomPaint(
+                  size: Size(_devicesizeget()[0]/2, _devicesizeget()[1]/2.6),  // 描画領域のサイズを設定
+                  painter: SquarePainter("right"),  // 描画ロジックを指定したカスタムペインター
+                )
+                    ],
+                  ), 
+                  
+                ),
+              ]
+              ),
+            // Container(
+            //   width: _devicesizeget()[0]/2,
+            //   height: _devicesizeget()[1]/2,
+            //   child: Row(
+            //   children:[
+            //     ClipRect(
+            //     clipper: MyClipper(offset),
+            //     child: 
+            //     Image.file(
+            //         File(image),
+            //         fit: BoxFit.fitWidth,
+            //         ),
+            //   ),
+            //     // ClipRect(
+            //     //   clipper: MyClipper(offset),
+            //     //   child: 
+            //       Image.file(
+            //           File(image),
+            //           fit: BoxFit.contain,
+            //           ),
+            //     // ),
+            //   ]
+            // ),
+            // ),
+            Container(
+                  width: _devicesizeget()[0],
+                  height: _devicesizeget()[1]/2/1.8,
+                  // color: Colors.blue,
+                  child:Column(crossAxisAlignment: CrossAxisAlignment.start, children:[
+                    Row(
+                      children: [
+                        Visibility(visible: texttf,
+                        child:Container(
+                          padding: EdgeInsets.only(top: 5),
+                          width: _devicesizeget()[0]/2.2,
+                          height: _devicesizeget()[1]/4,
+                          child:Center(
+                            child: Column(children: [
+                              Text("抱っこスコア",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 25,color: Colors.black)),
+                              Text(text,style: TextStyle(fontWeight: FontWeight.bold,fontSize: 130,color: Colors.red))
+                            ]),
+                          )
+
+                        )
+                        ),
+                        // Visibility(child: Text(kendall_text),visible: tf ),
+                        Visibility(visible: tf,
+                          child:Container(
+                          width: _devicesizeget()[0]/2,
+                          height: _devicesizeget()[1]/4,
+                            //レーダーチャート
+                          padding: EdgeInsets.only(top: 20,right: 20),
+                            child: RadarChart(
+                              RadarChartData( 
+                                tickCount: 5, // レーダーチャートの軸目盛りの数
+                                titleTextStyle:
+                                TextStyle(color: Colors.black, fontSize: 16,fontWeight: FontWeight.bold),
+                                gridBorderData: BorderSide.none, // グラフ内の数字を非表示にする,
+                                getTitle: ((index,angle) {
+                                  if (index == 0){
+                                    return RadarChartTitle(
+                                      text: '抱っこの高さ',
+                                      angle: 0
+                                    );
+                                  }
+                                  if (index == 1){
+                                    return RadarChartTitle(
+                                      text: '背筋',
+                                      angle: 0
+                                    );
+                                  }
+                                  if (index == 2){
+                                    return RadarChartTitle(
+                                      text: '肩のバランス',
+                                      angle: 0
+                                    );
+                                  }
+                                  if (index == 3){
+                                    return RadarChartTitle(
+                                      text: 'あ',
+                                      angle: 0
+                                    );
+                                  }
+                                  if (index == 4){
+                                    return RadarChartTitle(
+                                      text: 'あ',
+                                      angle: 0
+                                    );
+                                  }
+                                  else{
+                                    return RadarChartTitle(
+                                      text: 'あ',
+                                      angle: 0
+                                    );
+                                  }
+                                }),
+                                dataSets: [
+                                  RadarDataSet(
+                                    fillColor: Colors.orange.withOpacity(0.4),
+                                    borderColor: Colors.red,
+                                    borderWidth: 4,
+                                    dataEntries: [
+                                      RadarEntry(value: (_triangular_chart()[5]-4).abs()),
+                                      RadarEntry(value: (_triangular_chart()[6]-4).abs()),
+                                      RadarEntry(value: (_triangular_chart()[7]-4).abs()),
+                                      RadarEntry(value: 4),
+                                      RadarEntry(value: 4),
+                                      // RadarEntry(value: 4.01),
+                                      // RadarEntry(value: 4.02),
+                                      // RadarEntry(value: 4.03),
+                                      // RadarEntry(value: 4.04),
+                                      // RadarEntry(value: 4.05),
+                                    ],
+                                    
+                                  ),
+                                ],
+                                // 他のチャートプロパティを設定
+
+                              ),
+                            ),
+                          ),
+                          )
+                      ],
+                    ),
+                    
+                    //BadPont
+                    Visibility(child: Text("横から見た姿勢："),visible: badtf),
+                    Visibility(child: Text(badtxt[0],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: badtf),
+                    Visibility(child: Text("抱っこの位置："),visible: badtf),
+                    Visibility(child: Text(badtxt[1],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: badtf),
+                    Visibility(child: Text("左右の肩の高さ："),visible: badtf),
+                    Visibility(child: Text(badtxt[2],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: badtf),
+                    //アドバイス
+                    Visibility(child: Text("横から見た姿勢："),visible: advicetf),
+                    Visibility(child: Text(advicetxt[0],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: advicetf),
+                    Visibility(child: Text("抱っこの位置："),visible: advicetf),
+                    Visibility(child: Text(advicetxt[1],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: advicetf),
+                    Visibility(child: Text("左右の肩の高さ："),visible: advicetf),
+                    Visibility(child: Text(advicetxt[2],style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18,color: Colors.red)),visible: advicetf),
+          ]
+          )
+            ),
+            ]),
+
+
             Row(mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -868,7 +1189,7 @@ class _EvaluationState extends State<Evaluation> {
                           badtf = false;
                           texttf = true;
                           advicetf = false;
-                          _openDialog();
+                          // _openDialog();
                         });
                       },
                       style: ElevatedButton.styleFrom(
@@ -876,7 +1197,7 @@ class _EvaluationState extends State<Evaluation> {
                         backgroundColor: downcolor_1.withOpacity(0.6),//ボタン背景色
                         elevation: 16,
                       ),
-                      child: Text(" 姿勢スコア",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 28,color: main_text_colors)),
+                      child: Text("抱っこスコア",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 28,color: main_text_colors)),
                     ),
                     ),
                 ),
@@ -895,7 +1216,7 @@ class _EvaluationState extends State<Evaluation> {
                           badtf = true;
                           texttf = false;
                           advicetf = false;
-                          _openDialog();
+                          // _openDialog();
                         });
                       },
                       style: ElevatedButton.styleFrom(
@@ -903,7 +1224,7 @@ class _EvaluationState extends State<Evaluation> {
                         backgroundColor: downcolor_2.withOpacity(0.6),
                         elevation: 16,
                       ),
-                      child: Text("Point",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 28,color: main_text_colors)),
+                      child: Text("要点",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 28,color: main_text_colors)),
                     ),
                     ),
                     Padding(padding: EdgeInsets.only(top: 10,left: 5),
@@ -921,7 +1242,7 @@ class _EvaluationState extends State<Evaluation> {
                           badtf = false;
                           texttf = false;
                           advicetf = true;
-                          _openDialog();
+                          // _openDialog();
                         });
                       },
                       style: ElevatedButton.styleFrom(
@@ -984,6 +1305,8 @@ class MyPainter extends CustomPainter{
     if(dir=="front"){
     //修正ページのx,y座標と合わせる必要があるため -Offset(0,120) , countで制御
     if(count==0){
+      //高菜
+    offsets = offsets.map((offset) => Offset(offset.dx / 2, offset.dy / 2)).toList();
       count++;
       if(offsets.length==9){
         landmarks.add(offsets[0]-Offset(0, 120));
@@ -1113,8 +1436,8 @@ class MyPainter extends CustomPainter{
         //範囲を描画する
         paint.color = Colors.red.withOpacity(0.5);
         paint.strokeWidth = 5;
-        canvas.drawCircle(Right_shoulder,25, paint);
-        canvas.drawCircle(Left_shoulder,25, paint);
+        canvas.drawCircle(Right_shoulder,15, paint);
+        canvas.drawCircle(Left_shoulder,15, paint);
         //shoulderbalanceテキスト表示(肩のバランス)
         String shouldertext = "肩のバランス";
         TextSpan shoulderSpan = TextSpan(
@@ -1131,7 +1454,7 @@ class MyPainter extends CustomPainter{
           //plotする
           paint.color = Colors.red.withOpacity(0.5);
           paint.strokeWidth = 5;
-          canvas.drawCircle(Right_wrist, 25, paint);
+          canvas.drawCircle(Right_wrist, 15, paint);
           //shoulderbalanceテキスト表示(肩のバランス)
           String hugheighttext = "抱っこの高さ";
           TextSpan hugheightSpan = TextSpan(
@@ -1146,7 +1469,7 @@ class MyPainter extends CustomPainter{
           //plotする
           paint.color = Colors.red.withOpacity(0.5);
           paint.strokeWidth = 5;
-          canvas.drawCircle(Left_wrist, 25, paint);
+          canvas.drawCircle(Left_wrist, 15, paint);
           //shoulderbalanceテキスト表示(肩のバランス)
           String hugheighttext = "抱っこの高さ";
           TextSpan hugheightSpan = TextSpan(
@@ -1236,6 +1559,8 @@ class MyPainter extends CustomPainter{
   if(dir=="right"){
         //修正ページのx,y座標と合わせる必要があるため -Offset(0,120) , countで制御
     if(count==0){
+      //高菜
+    offsets = offsets.map((offset) => Offset(offset.dx / 2, offset.dy / 2)).toList();
       count++;
       if(offsets.length==7){
         landmarks.add(offsets[0]-Offset(0, 120));
@@ -1342,7 +1667,7 @@ class MyPainter extends CustomPainter{
         //plot
         paint.color = Colors.red.withOpacity(0.5);
         paint.strokeWidth = 5;
-        canvas.drawCircle(Right_shoulder, 25, paint);
+        canvas.drawCircle(Right_shoulder, 15, paint);
         //shoulderbalanceテキスト表示(肩のバランス)
         String shouldertext = "肩のバランス";
         TextSpan shoulderSpan = TextSpan(
@@ -1358,7 +1683,7 @@ class MyPainter extends CustomPainter{
         //plotする
         paint.color = Colors.red.withOpacity(0.5);
         paint.strokeWidth = 5;
-        canvas.drawCircle(Right_wrist, 25, paint);
+        canvas.drawCircle(Right_wrist, 15, paint);
         //shoulderbalanceテキスト表示(肩のバランス)
         String hugheighttext = "抱っこの高さ";
         TextSpan hugheightSpan = TextSpan(
@@ -1406,6 +1731,8 @@ class MyPainter extends CustomPainter{
   if(dir=="left"){
       //修正ページのx,y座標と合わせる必要があるため -Offset(0,120) , countで制御
     if(count==0){
+      //高菜
+    offsets = offsets.map((offset) => Offset(offset.dx / 2, offset.dy / 2)).toList();
       count++;
       if(offsets.length==7){
         landmarks.add(offsets[0]-Offset(0, 120));
@@ -1539,7 +1866,7 @@ class MyPainter extends CustomPainter{
         //polotする
         paint.color = Colors.red.withOpacity(0.5);
         paint.strokeWidth = 5;
-        canvas.drawCircle(Left_shoulder, 25, paint);
+        canvas.drawCircle(Left_shoulder, 15, paint);
         //shoulderbalanceテキスト表示(肩のバランス)
         String shouldertext = "肩のバランス";
         TextSpan shoulderSpan = TextSpan(
@@ -1556,7 +1883,7 @@ class MyPainter extends CustomPainter{
           //plotする
           paint.color = Colors.red.withOpacity(0.5);
           paint.strokeWidth = 5;
-          canvas.drawCircle(Left_wrist, 25, paint);
+          canvas.drawCircle(Left_wrist, 15, paint);
           //shoulderbalanceテキスト表示(肩のバランス)
           String hugheighttext = "抱っこの高さ";
           TextSpan hugheightSpan = TextSpan(
@@ -1630,5 +1957,55 @@ class ImagePainter extends CustomPainter{
   @override
   bool shouldRepaint(CustomPainter oldDelegate) {
     return true;
+  }
+}
+//高菜
+class MyClipper extends CustomClipper<Rect> {
+  List<Offset> offsets;
+  MyClipper(this.offsets);
+    Rect getClip(Size size) {
+      //最大値と最小値を求める
+      List<double> xCoordinates = offsets.map((offset) => offset.dx).toList();
+      List<double> yCoordinates = offsets.map((offset) => offset.dy).toList();
+      double maxX = xCoordinates.reduce((a, b) => a > b ? a : b);
+      double maxY = yCoordinates.reduce((a, b) => a > b ? a : b);
+      double minX = xCoordinates.reduce((a, b) => a < b ? a : b);
+      double minY = yCoordinates.reduce((a, b) => a < b ? a : b);
+      Offset maxoffset = Offset(maxX, maxY);
+      Offset minoffset = Offset(minX, minY);
+        return Rect.fromPoints(minoffset*0.8/2, maxoffset*1.1/2);//座標
+    }
+
+    bool shouldReclip(covariant CustomClipper<Rect> oldClipper) {
+        return false; // トリミングは常に同じであるため、再クリップを行わない
+    }
+}
+
+class SquarePainter extends CustomPainter {
+  String dir;
+  SquarePainter(this.dir);
+  @override
+  void paint(Canvas canvas, Size size) {
+    if(dir=="front"){
+      final paint = Paint()
+      ..color = Colors.orange
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8.0;
+      final rect = Rect.fromLTWH(5, 5, size.width-5, size.height-10);
+      canvas.drawRect(rect, paint);
+    }
+    if(dir=="right"){
+      final paint = Paint()
+      ..color = Colors.green
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8.0;
+      final rect = Rect.fromLTWH(5, 5, size.width-5, size.height-10);
+      canvas.drawRect(rect, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) {
+    return false;
   }
 }
